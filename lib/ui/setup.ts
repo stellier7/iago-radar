@@ -1,3 +1,5 @@
+import { getConnectionString } from "@/lib/db";
+
 export type SetupProblem = {
   title: string;
   detail: string;
@@ -8,7 +10,7 @@ export type SetupProblem = {
 const UNDEFINED_TABLE = "42P01";
 
 export function isDatabaseConfigured(): boolean {
-  return Boolean(process.env.DATABASE_URL);
+  return Boolean(getConnectionString());
 }
 
 const MISSING_DATABASE_URL: SetupProblem = {

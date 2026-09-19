@@ -9,8 +9,16 @@ declare global {
   var __iagoRadarPool: Pool | undefined;
 }
 
+/**
+ * Vercel's Postgres and Neon integrations inject `POSTGRES_URL` rather than
+ * `DATABASE_URL`, so accept either instead of making people duplicate the value.
+ */
+export function getConnectionString(): string | undefined {
+  return process.env.DATABASE_URL || process.env.POSTGRES_URL || undefined;
+}
+
 function createPool(): Pool {
-  const connectionString = process.env.DATABASE_URL;
+  const connectionString = getConnectionString();
   if (!connectionString) {
     throw new Error("DATABASE_URL is not set. Copy .env.example to .env.local and fill it in.");
   }

@@ -155,8 +155,11 @@ whatever the dashboard happens to have saved.
 Then:
 
 1. Create a free Neon or Vercel Postgres database; set `DATABASE_URL` (pooled) in
-   Vercel.
-2. Set `CRON_SECRET` (`openssl rand -hex 32`) and `OSM_CONTACT`.
+   Vercel. Attaching a database through the Vercel Marketplace sets this for you,
+   sometimes as `POSTGRES_URL`, which is read as a fallback.
+2. Set `CRON_SECRET` (`openssl rand -hex 32`) and `OSM_CONTACT`. Without
+   `CRON_SECRET` the cron route rejects Vercel's own call in production, so the
+   nightly crawl never runs.
 3. Deploy. The build runs the migrations itself (`vercel-build`), so the schema
    and the Tegucigalpa row are created for you. Concurrent builds are safe: the
    runner takes a Postgres advisory lock.

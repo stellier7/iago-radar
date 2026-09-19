@@ -16,12 +16,13 @@ const MIGRATION_LOCK_KEY = 8_527_301;
 async function main() {
   // The Vercel build runs this with --if-configured so a project without a
   // database yet still deploys; the app then shows a setup screen instead.
-  if (process.argv.includes("--if-configured") && !process.env.DATABASE_URL) {
+  const { getConnectionString, getPool } = await import("../lib/db");
+
+  if (process.argv.includes("--if-configured") && !getConnectionString()) {
     console.log("DATABASE_URL is not set - skipping migrations.");
     return;
   }
 
-  const { getPool } = await import("../lib/db");
   const pool = getPool();
 
   const lock = await pool.connect();
