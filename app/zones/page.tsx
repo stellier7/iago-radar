@@ -1,13 +1,18 @@
+import { SetupNotice } from "@/components/setup-notice";
 import { ZoneManager } from "@/components/zone-manager";
 import { getCityBySlug } from "@/lib/repo/cities";
 import { listZonesWithCounts } from "@/lib/repo/zones";
 import { parseFilters, type RawSearchParams } from "@/lib/ui/filters";
+import { loadOrExplainSetup } from "@/lib/ui/setup";
 
 export const dynamic = "force-dynamic";
 
 export default async function ZonesPage({ searchParams }: { searchParams: Promise<RawSearchParams> }) {
   const { citySlug } = parseFilters(await searchParams);
-  const city = await getCityBySlug(citySlug);
+
+  const cityResult = await loadOrExplainSetup(() => getCityBySlug(citySlug));
+  if (!cityResult.ok) return <SetupNotice problem={cityResult.problem} />;
+  const city = cityResult.data;
 
   if (!city) {
     return <p className="text-sm text-ink-muted">No city called &ldquo;{citySlug}&rdquo;.</p>;

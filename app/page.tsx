@@ -11,14 +11,19 @@ import {
   type BusinessFilters,
   type BusinessRecord,
 } from "@/lib/repo/businesses";
+import { SetupNotice } from "@/components/setup-notice";
 import { getCityBySlug } from "@/lib/repo/cities";
 import { PAGE_SIZE, parseFilters, toQueryString, type RawSearchParams } from "@/lib/ui/filters";
+import { loadOrExplainSetup } from "@/lib/ui/setup";
 
 export const dynamic = "force-dynamic";
 
 export default async function ProspectsPage({ searchParams }: { searchParams: Promise<RawSearchParams> }) {
   const state = parseFilters(await searchParams);
-  const city = await getCityBySlug(state.citySlug);
+
+  const cityResult = await loadOrExplainSetup(() => getCityBySlug(state.citySlug));
+  if (!cityResult.ok) return <SetupNotice problem={cityResult.problem} />;
+  const city = cityResult.data;
 
   if (!city) {
     return (

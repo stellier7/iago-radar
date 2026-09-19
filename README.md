@@ -140,12 +140,27 @@ requests, no re-crawl.
 
 ## Deploying
 
+**Vercel builds your production branch, which is `main` by default.** If the app
+lives on a feature branch, `main` has no `package.json`, so Vercel has nothing to
+build and every route 404s. Either merge into `main`, or point Vercel at the
+branch under Settings → Git → Production Branch.
+
+Then:
+
 1. Create a free Neon or Vercel Postgres database; set `DATABASE_URL` (pooled) in
    Vercel.
 2. Set `CRON_SECRET` (`openssl rand -hex 32`) and `OSM_CONTACT`.
-3. Deploy. `vercel.json` registers the nightly cron at 07:00 UTC (01:00 in
-   Honduras), which Vercel calls with `Authorization: Bearer $CRON_SECRET`.
-4. Run `npm run db:migrate` once against the production database.
+3. Deploy. The build runs the migrations itself (`vercel-build`), so the schema
+   and the Tegucigalpa row are created for you. Concurrent builds are safe: the
+   runner takes a Postgres advisory lock.
+4. `vercel.json` registers the nightly cron at 07:00 UTC (01:00 in Honduras),
+   which Vercel calls with `Authorization: Bearer $CRON_SECRET`.
+
+Until `DATABASE_URL` is set, or if the migrations have not run, the app shows a
+setup screen naming the missing step instead of a stack trace.
+
+The first night's cron populates the database. To see data immediately, run
+`npm run crawl` locally against the production `DATABASE_URL`.
 
 Hobby-tier notes: two cron jobs, daily granularity, 60 s max function duration.
 The slice-and-chain design is what makes a nightly cron enough to cover the whole
@@ -170,6 +185,7 @@ To crawl it nightly, add a second entry to `vercel.json` (Hobby allows two).
 | Command | What it does |
 | --- | --- |
 | `npm run db:migrate` | Applies `db/migrations/*.sql` in order, once each |
+| `npm run vercel-build` | What Vercel runs: migrate (if configured), then build |
 | `npm run crawl` | Drains a city's cell queue locally, no time limit |
 | `npm run report` | Coverage, niche/zone/template breakdown, sample prospects |
 | `npm run regroup` | Re-derives everything from stored tags, no Overpass calls |

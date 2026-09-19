@@ -1,16 +1,21 @@
 import { RunSliceButton } from "@/components/run-slice-button";
+import { SetupNotice } from "@/components/setup-notice";
 import { areaKm2 } from "@/lib/geo/bbox";
 import { splitIntoCells } from "@/lib/geo/grid";
 import { MAX_QUERY_AREA_KM2, OVERPASS_TIMEOUT_SECONDS } from "@/lib/osm/overpass";
 import { cityBbox, getCityBySlug } from "@/lib/repo/cities";
 import { getRunProgress, listFailedCells, listRecentRuns } from "@/lib/repo/crawl";
 import { parseFilters, type RawSearchParams } from "@/lib/ui/filters";
+import { loadOrExplainSetup } from "@/lib/ui/setup";
 
 export const dynamic = "force-dynamic";
 
 export default async function CrawlPage({ searchParams }: { searchParams: Promise<RawSearchParams> }) {
   const { citySlug } = parseFilters(await searchParams);
-  const city = await getCityBySlug(citySlug);
+
+  const cityResult = await loadOrExplainSetup(() => getCityBySlug(citySlug));
+  if (!cityResult.ok) return <SetupNotice problem={cityResult.problem} />;
+  const city = cityResult.data;
 
   if (!city) {
     return <p className="text-sm text-ink-muted">No city called &ldquo;{citySlug}&rdquo;.</p>;
