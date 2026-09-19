@@ -1,15 +1,30 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
+import { classify, type OsmTags } from "../lib/osm/categories";
 import { DEFAULT_TEMPLATE_KEY, TEMPLATES, templateForNiche, templateLabel } from "../lib/templates/registry";
+
+/** The real path: OSM tags become a niche, and the niche picks a template. */
+function templateForTags(tags: OsmTags): string {
+  const classification = classify(tags);
+  assert.ok(classification, `${JSON.stringify(tags)} was not classified as a business`);
+  return templateForNiche(classification.nicheKey);
+}
 
 test("today's three templates match their niches", () => {
   assert.equal(templateForNiche("healthcare:dentist"), "dentist");
-  assert.equal(templateForNiche("amenity:dentist"), "dentist");
   assert.equal(templateForNiche("amenity:cafe"), "coffee_shop");
   assert.equal(templateForNiche("shop:coffee"), "coffee_shop");
   assert.equal(templateForNiche("shop:hairdresser"), "beauty_salon");
   assert.equal(templateForNiche("shop:beauty"), "beauty_salon");
+});
+
+test("templates match whichever way the trade is tagged", () => {
+  assert.equal(templateForTags({ healthcare: "dentist" }), "dentist");
+  assert.equal(templateForTags({ amenity: "dentist" }), "dentist", "the deprecated tag must still match");
+  assert.equal(templateForTags({ amenity: "cafe" }), "coffee_shop");
+  assert.equal(templateForTags({ shop: "hairdresser" }), "beauty_salon");
+  assert.equal(templateForTags({ shop: "bakery" }), DEFAULT_TEMPLATE_KEY);
 });
 
 test("unmatched niches fall into the default bucket instead of being dropped", () => {

@@ -1,12 +1,14 @@
 import { getPool, query, type Queryable } from "../db";
 import type { ZoneAssignment } from "../zones/derive";
 
+export type ZoneSource = "osm_tag" | "osm_place" | "grid";
+
 export type Zone = {
   id: number;
   cityId: number;
   derivationKey: string;
   name: string;
-  source: "osm_tag" | "grid";
+  source: ZoneSource;
   centerLat: number | null;
   centerLon: number | null;
   mergedIntoZoneId: number | null;
@@ -22,7 +24,7 @@ type ZoneRow = {
   city_id: number;
   derivation_key: string;
   name: string;
-  source: "osm_tag" | "grid";
+  source: ZoneSource;
   center_lat: number | null;
   center_lon: number | null;
   merged_into_zone_id: number | null;
@@ -111,6 +113,27 @@ export async function listZonesWithCounts(cityId: number): Promise<ZoneWithCount
     businessCount: Number(row.business_count),
     prospectCount: Number(row.prospect_count),
   }));
+}
+
+/**
+ * Deletes auto-generated grid zones that no longer hold any business, which is
+ * what re-deriving leaves behind when a better zone source appears. Zones you
+ * renamed are kept: their name no longer matches the generated pattern.
+ */
+export async function pruneEmptyAutoZones(cityId: number): Promise<number> {
+  const rows = await query<{ id: number }>(
+    `
+    delete from zones z
+    where z.city_id = $1
+      and z.source = 'grid'
+      and z.merged_into_zone_id is null
+      and z.name ~ '^Grid [A-Z]+[0-9]+$'
+      and not exists (select 1 from businesses b where b.zone_id = z.id)
+    returning z.id
+    `,
+    [cityId],
+  );
+  return rows.length;
 }
 
 export async function renameZone(zoneId: number, name: string): Promise<void> {

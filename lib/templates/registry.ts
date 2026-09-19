@@ -18,9 +18,10 @@ export type Template = {
 
 export const TEMPLATES: Template[] = [
   {
+    // `amenity=dentist` is aliased onto `healthcare:dentist` in categories.ts.
     key: "dentist",
     label: "Dentist",
-    niches: ["healthcare:dentist", "amenity:dentist", "shop:dental_hygienist", "healthcare:orthodontist"],
+    niches: ["healthcare:dentist", "healthcare:orthodontist", "shop:dental_hygienist"],
   },
   {
     key: "coffee_shop",

@@ -14,19 +14,21 @@ export default async function ZonesPage({ searchParams }: { searchParams: Promis
   }
 
   const zones = await listZonesWithCounts(city.id);
-  const active = zones.filter((zone) => zone.mergedIntoZoneId === null);
   const merged = zones.filter((zone) => zone.mergedIntoZoneId !== null);
-  const named = active.filter((zone) => zone.source === "osm_tag").length;
+  // An empty zone is a leftover from re-deriving; there is nothing to act on.
+  const active = zones.filter((zone) => zone.mergedIntoZoneId === null && zone.businessCount > 0);
+  const fromOsm = active.filter((zone) => zone.source !== "grid").length;
 
   return (
     <div>
       <p className="mb-1 text-sm text-ink-muted">
-        <strong className="text-ink">{active.length}</strong> zones in {city.name} · {named} from OSM neighbourhood tags
-        · {active.length - named} auto-generated {city.zoneSizeKm} km squares
+        <strong className="text-ink">{active.length}</strong> zones in {city.name} · {fromOsm} named by OpenStreetMap ·{" "}
+        {active.length - fromOsm} auto-generated {city.zoneSizeKm} km squares
       </p>
       <p className="mb-4 text-xs text-ink-muted">
-        Rename an auto grid zone once you recognise the area, or merge it into a neighbour. Renaming keeps its identity,
-        so the next crawl files businesses under the name you chose.
+        Zones come from a business&rsquo;s own <code>addr:</code> tag, else the nearest named OSM neighbourhood, else a
+        grid square. Rename one once you recognise the area, or merge it into a neighbour. Renaming keeps a zone&rsquo;s
+        identity, so the next crawl files businesses under the name you chose.
       </p>
 
       {active.length === 0 ? (

@@ -1,7 +1,14 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { deriveZone, gridZoneIndex, rowLabel, slugify } from "../lib/zones/derive";
+import type { OsmPlace } from "../lib/osm/places";
+import { MAX_PLACE_DISTANCE_KM, deriveZone, gridZoneIndex, nearestPlace, rowLabel, slugify } from "../lib/zones/derive";
+
+const PLACES: OsmPlace[] = [
+  { osmType: "node", osmId: 1, name: "Colonia Kennedy", placeType: "neighbourhood", lat: 14.0705, lon: -87.1817 },
+  { osmType: "node", osmId: 2, name: "Palmira", placeType: "neighbourhood", lat: 14.0965, lon: -87.1938 },
+  { osmType: "node", osmId: 3, name: "Barrio La Leona", placeType: "quarter", lat: 14.1046, lon: -87.2078 },
+];
 
 const CONFIG = {
   minLat: 14.0068238,
@@ -48,11 +55,46 @@ test("accents and punctuation normalise to one stable key", () => {
   );
 });
 
-test("untagged businesses fall back to a named grid square", () => {
+test("untagged businesses fall back to a named grid square when there are no places", () => {
   const zone = deriveZone(business(), CONFIG);
   assert.equal(zone.source, "grid");
   assert.match(zone.derivationKey, /^grid:\d+:\d+$/);
   assert.match(zone.name, /^Grid [A-Z]+\d+$/);
+});
+
+test("untagged businesses take the name of the nearest neighbourhood", () => {
+  const zone = deriveZone(business({ lat: 14.0968, lon: -87.1941 }), CONFIG, PLACES);
+  assert.equal(zone.source, "osm_place");
+  assert.equal(zone.name, "Palmira");
+  assert.equal(zone.derivationKey, "place:node:2");
+});
+
+test("a business far from every neighbourhood still falls back to the grid", () => {
+  // Deep in the rural south of the bbox, kilometres from any place node.
+  const zone = deriveZone(business({ lat: 14.0100, lon: -87.2700 }), CONFIG, PLACES);
+  assert.equal(zone.source, "grid");
+});
+
+test("an addr: tag outranks a nearby neighbourhood", () => {
+  const zone = deriveZone(business({ addrSuburb: "Comayagüela", lat: 14.0965, lon: -87.1938 }), CONFIG, PLACES);
+  assert.equal(zone.source, "osm_tag");
+  assert.equal(zone.name, "Comayagüela");
+});
+
+test("nearest place respects the distance cap", () => {
+  assert.equal(nearestPlace(PLACES, 14.0965, -87.1938)?.name, "Palmira");
+  assert.equal(nearestPlace(PLACES, 14.5, -87.9), null);
+  assert.equal(nearestPlace([], 14.0965, -87.1938), null);
+});
+
+test("the place distance cap is a neighbourhood-sized radius", () => {
+  assert.ok(MAX_PLACE_DISTANCE_KM > 0.3 && MAX_PLACE_DISTANCE_KM < 3);
+});
+
+test("a place zone keeps the same key however many businesses land in it", () => {
+  const a = deriveZone(business({ lat: 14.0960, lon: -87.1930 }), CONFIG, PLACES);
+  const b = deriveZone(business({ lat: 14.0970, lon: -87.1945 }), CONFIG, PLACES);
+  assert.equal(a.derivationKey, b.derivationKey);
 });
 
 test("nearby businesses share a grid zone and distant ones do not", () => {

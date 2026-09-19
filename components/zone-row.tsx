@@ -5,6 +5,12 @@ import { useActionState } from "react";
 import { mergeZonesAction, renameZoneAction, type ZoneActionResult } from "@/app/zones/actions";
 import type { ZoneWithCounts } from "@/lib/repo/zones";
 
+export const ZONE_SOURCE_LABELS: Record<ZoneWithCounts["source"], string> = {
+  osm_tag: "from addr: tag",
+  osm_place: "nearest OSM place",
+  grid: "auto grid square",
+};
+
 export function ZoneRow({ zone, allZones }: { zone: ZoneWithCounts; allZones: ZoneWithCounts[] }) {
   const [renameResult, rename, renaming] = useActionState<ZoneActionResult | null, FormData>(renameZoneAction, null);
   const [mergeResult, merge, merging] = useActionState<ZoneActionResult | null, FormData>(mergeZonesAction, null);
@@ -19,7 +25,7 @@ export function ZoneRow({ zone, allZones }: { zone: ZoneWithCounts; allZones: Zo
           {zone.businessCount} businesses · {zone.prospectCount} without a site
         </p>
         <span className="rounded-full bg-surface-muted px-2 py-0.5 text-xs text-ink-muted">
-          {zone.source === "grid" ? "auto grid" : "OSM tag"}
+          {ZONE_SOURCE_LABELS[zone.source]}
         </span>
       </div>
 

@@ -33,6 +33,18 @@ export function areaKm2(bbox: BoundingBox): number {
   return Math.abs(heightKm * widthKm);
 }
 
+/** Great-circle distance in kilometres. */
+export function distanceKm(aLat: number, aLon: number, bLat: number, bLon: number): number {
+  const earthRadiusKm = 6371;
+  const toRad = (degrees: number) => (degrees * Math.PI) / 180;
+
+  const dLat = toRad(bLat - aLat);
+  const dLon = toRad(bLon - aLon);
+  const h =
+    Math.sin(dLat / 2) ** 2 + Math.cos(toRad(aLat)) * Math.cos(toRad(bLat)) * Math.sin(dLon / 2) ** 2;
+  return 2 * earthRadiusKm * Math.asin(Math.min(1, Math.sqrt(h)));
+}
+
 export function contains(bbox: BoundingBox, lat: number, lon: number): boolean {
   return lat >= bbox.minLat && lat <= bbox.maxLat && lon >= bbox.minLon && lon <= bbox.maxLon;
 }

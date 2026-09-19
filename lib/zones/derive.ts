@@ -1,11 +1,12 @@
-import { kmToLatDegrees, kmToLonDegrees, type BoundingBox } from "../geo/bbox";
+import { distanceKm, kmToLatDegrees, kmToLonDegrees, type BoundingBox } from "../geo/bbox";
 import type { NormalizedBusiness } from "../osm/normalize";
+import type { OsmPlace } from "../osm/places";
 
 export type ZoneAssignment = {
   /** Stable identity for the zone. Renaming a zone must not change this. */
   derivationKey: string;
   name: string;
-  source: "osm_tag" | "grid";
+  source: "osm_tag" | "osm_place" | "grid";
   centerLat: number;
   centerLon: number;
 };
@@ -13,6 +14,30 @@ export type ZoneAssignment = {
 export type ZoneGridConfig = BoundingBox & {
   zoneSizeKm: number;
 };
+
+/**
+ * How far a business may be from a named neighbourhood centre and still be
+ * filed under it. Place nodes mark a rough centre, not a boundary, so this is a
+ * judgement call: wide enough to cover a colonia, tight enough that an isolated
+ * business on the edge of town falls back to the grid instead of being filed
+ * under a neighbourhood it is nowhere near.
+ */
+export const MAX_PLACE_DISTANCE_KM = 1.2;
+
+export function nearestPlace(places: readonly OsmPlace[], lat: number, lon: number): OsmPlace | null {
+  let best: OsmPlace | null = null;
+  let bestDistance = Infinity;
+
+  for (const place of places) {
+    const distance = distanceKm(lat, lon, place.lat, place.lon);
+    if (distance < bestDistance) {
+      best = place;
+      bestDistance = distance;
+    }
+  }
+
+  return bestDistance <= MAX_PLACE_DISTANCE_KM ? best : null;
+}
 
 export function slugify(value: string): string {
   return value
@@ -64,13 +89,18 @@ function gridZone(config: ZoneGridConfig, lat: number, lon: number): ZoneAssignm
 }
 
 /**
- * Zone for a business: its OSM neighbourhood tag when it has one, otherwise the
- * fallback grid square. Grid zones are meant to be renamed and merged by hand
- * once you recognise the area.
+ * Zone for a business, in order of preference:
+ *
+ * 1. Its own `addr:suburb` / `addr:neighbourhood` tag. Best, but rare - not one
+ *    of Tegucigalpa's 2371 businesses had it.
+ * 2. The nearest named OSM `place` node within MAX_PLACE_DISTANCE_KM. This is
+ *    what gives real names like "Colonia Kennedy".
+ * 3. A fallback grid square, named "Grid B7", to be renamed by hand.
  */
 export function deriveZone(
   business: Pick<NormalizedBusiness, "addrSuburb" | "addrNeighbourhood" | "lat" | "lon" | "tags">,
   config: ZoneGridConfig,
+  places: readonly OsmPlace[] = [],
 ): ZoneAssignment {
   const lat = business.lat ?? (config.minLat + config.maxLat) / 2;
   const lon = business.lon ?? (config.minLon + config.maxLon) / 2;
@@ -83,6 +113,17 @@ export function deriveZone(
 
   if (tagged) {
     return { ...tagged, centerLat: lat, centerLon: lon };
+  }
+
+  const place = nearestPlace(places, lat, lon);
+  if (place) {
+    return {
+      derivationKey: `place:${place.osmType}:${place.osmId}`,
+      name: place.name,
+      source: "osm_place",
+      centerLat: place.lat,
+      centerLon: place.lon,
+    };
   }
 
   return gridZone(config, lat, lon);

@@ -52,16 +52,20 @@ async function main() {
     with_hours: string;
     unnamed: string;
     tag_zoned: string;
+    place_zoned: string;
+    grid_zoned: string;
   }>(
     `
     select count(*) as total,
-           count(*) filter (where has_website = false) as prospects,
-           count(*) filter (where phone is not null) as with_phone,
-           count(*) filter (where email is not null) as with_email,
-           count(*) filter (where socials <> '{}'::jsonb) as with_social,
-           count(*) filter (where opening_hours is not null) as with_hours,
-           count(*) filter (where name is null) as unnamed,
-           count(*) filter (where z.source = 'osm_tag') as tag_zoned
+           count(*) filter (where b.has_website = false) as prospects,
+           count(*) filter (where b.phone is not null) as with_phone,
+           count(*) filter (where b.email is not null) as with_email,
+           count(*) filter (where b.socials <> '{}'::jsonb) as with_social,
+           count(*) filter (where b.opening_hours is not null) as with_hours,
+           count(*) filter (where b.name is null) as unnamed,
+           count(*) filter (where z.source = 'osm_tag') as tag_zoned,
+           count(*) filter (where z.source = 'osm_place') as place_zoned,
+           count(*) filter (where z.source = 'grid') as grid_zoned
     from businesses b left join zones z on z.id = b.zone_id
     where b.city_id = $1
     `,
@@ -79,7 +83,9 @@ async function main() {
     { metric: "has social profile", count: totals!.with_social, share: pct(totals!.with_social) },
     { metric: "has opening hours", count: totals!.with_hours, share: pct(totals!.with_hours) },
     { metric: "unnamed", count: totals!.unnamed, share: pct(totals!.unnamed) },
-    { metric: "zone from OSM tag", count: totals!.tag_zoned, share: pct(totals!.tag_zoned) },
+    { metric: "zone from addr: tag", count: totals!.tag_zoned, share: pct(totals!.tag_zoned) },
+    { metric: "zone from nearby place", count: totals!.place_zoned, share: pct(totals!.place_zoned) },
+    { metric: "zone from fallback grid", count: totals!.grid_zoned, share: pct(totals!.grid_zoned) },
   ]);
 
   console.log("\n-- top niches --");

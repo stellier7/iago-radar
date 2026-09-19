@@ -1,6 +1,8 @@
 import { splitIntoCells } from "../geo/grid";
 import { dedupeByOsmId, normalizeElement } from "../osm/normalize";
-import { fetchBusinesses, OVERPASS_TIMEOUT_SECONDS } from "../osm/overpass";
+import { fetchBusinesses, OVERPASS_TIMEOUT_SECONDS, sleep } from "../osm/overpass";
+import { fetchPlaces } from "../osm/places";
+import { listPlaces, upsertPlaces } from "../repo/places";
 import { upsertBusinesses, type BusinessWithZone } from "../repo/businesses";
 import { cityBbox, getCityBySlug, type City } from "../repo/cities";
 import {
@@ -50,7 +52,19 @@ const PER_REQUEST_TIMEOUT_MS = 20_000;
 
 const MIN_TIME_FOR_ANOTHER_CELL_MS = 6_000;
 
-async function getOrCreateRun(city: City, trigger: "cron" | "manual"): Promise<CrawlRun> {
+/**
+ * When every outstanding cell is held by another slice (or by one that died
+ * moments ago), wait for it to either finish or go stale rather than declaring
+ * the run complete.
+ */
+const IDLE_WAIT_MS = 5_000;
+const MAX_IDLE_WAIT_TOTAL_MS = 120_000;
+
+async function getOrCreateRun(
+  city: City,
+  trigger: "cron" | "manual",
+  log: (message: string) => void,
+): Promise<CrawlRun> {
   const existing = await findRunningRun(city.id);
   if (existing) {
     // A previous slice may have died with cells marked `running`.
@@ -58,6 +72,17 @@ async function getOrCreateRun(city: City, trigger: "cron" | "manual"): Promise<C
     const progress = await getRunProgress(existing.id);
     if (progress.outstanding > 0) return existing;
     await finishRun(existing.id, progress);
+  }
+
+  // Refresh the neighbourhood gazetteer once per run, before any cell is
+  // crawled, so businesses get real zone names on their first pass. A failure
+  // here is not fatal: zones fall back to grid squares.
+  try {
+    const places = await fetchPlaces(cityBbox(city));
+    const written = await upsertPlaces(getPool(), city.id, places);
+    log(`Gazetteer: ${places.length} named places found, ${written} stored.`);
+  } catch (error) {
+    log(`Gazetteer refresh failed, falling back to grid zones: ${(error as Error).message}`);
   }
 
   const cells = splitIntoCells(cityBbox(city), city.cellSizeKm);
@@ -75,8 +100,9 @@ export async function runCrawlSlice(options: CrawlSliceOptions): Promise<CrawlSl
   const city = await getCityBySlug(options.citySlug);
   if (!city) throw new Error(`Unknown city: ${options.citySlug}`);
 
-  const run = await getOrCreateRun(city, options.trigger);
+  const run = await getOrCreateRun(city, options.trigger, log);
   const zoneConfig = { ...cityBbox(city), zoneSizeKm: city.zoneSizeKm };
+  const places = await listPlaces(city.id);
 
   const result: CrawlSliceResult = {
     runId: run.id,
@@ -89,6 +115,7 @@ export async function runCrawlSlice(options: CrawlSliceOptions): Promise<CrawlSl
   };
 
   let observedCellMs = 4_000;
+  let idleWaitedMs = 0;
 
   while (true) {
     const elapsed = Date.now() - startedAt;
@@ -104,7 +131,23 @@ export async function runCrawlSlice(options: CrawlSliceOptions): Promise<CrawlSl
     }
 
     const cell = await claimNextCell(run.id);
-    if (!cell) break;
+    if (!cell) {
+      const progress = await getRunProgress(run.id);
+      if (progress.outstanding === 0) break;
+
+      const requeued = await requeueStaleCells(run.id);
+      if (requeued > 0) {
+        log(`Requeued ${requeued} cell(s) abandoned by an earlier slice.`);
+        continue;
+      }
+      if (idleWaitedMs >= MAX_IDLE_WAIT_TOTAL_MS) {
+        log(`${progress.outstanding} cell(s) still held by another slice; leaving them for the next one.`);
+        break;
+      }
+      idleWaitedMs += IDLE_WAIT_MS;
+      await sleep(IDLE_WAIT_MS);
+      continue;
+    }
 
     const cellStartedAt = Date.now();
     try {
@@ -123,7 +166,7 @@ export async function runCrawlSlice(options: CrawlSliceOptions): Promise<CrawlSl
           const resolveZone = createZoneResolver(client, city.id);
           const withZones: BusinessWithZone[] = [];
           for (const business of normalized) {
-            withZones.push({ ...business, zoneId: await resolveZone(deriveZone(business, zoneConfig)) });
+            withZones.push({ ...business, zoneId: await resolveZone(deriveZone(business, zoneConfig, places)) });
           }
           upserted = await upsertBusinesses(client, city.id, withZones);
           await client.query("commit");

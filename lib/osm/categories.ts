@@ -120,8 +120,43 @@ const PRIMARY_TAG_LABELS: Record<PrimaryTag, string> = {
   tourism: "Lodging",
 };
 
+/**
+ * The same trade is often tagged two ways - `amenity=pharmacy` and
+ * `healthcare=pharmacy` both appear ~66 times in Tegucigalpa. Folding the
+ * duplicates onto one niche key keeps the filter list and the template mapping
+ * from splitting in half.
+ */
+const NICHE_ALIASES: Record<string, string> = {
+  "amenity:pharmacy": "healthcare:pharmacy",
+  "amenity:dentist": "healthcare:dentist",
+  "amenity:doctors": "healthcare:doctor",
+  "healthcare:doctors": "healthcare:doctor",
+  "amenity:clinic": "healthcare:clinic",
+  "amenity:veterinary": "healthcare:veterinary",
+  "amenity:hospital": "healthcare:hospital",
+};
+
+/** `shop=yes` means "a shop, trade unspecified" - "Yes (Shop)" reads like a bug. */
+const UNSPECIFIED_VALUES = new Set(["yes", "*"]);
+
 export function nicheLabel(primaryTag: PrimaryTag, primaryValue: string): string {
+  if (UNSPECIFIED_VALUES.has(primaryValue)) {
+    return `Unspecified ${PRIMARY_TAG_LABELS[primaryTag].toLowerCase()}`;
+  }
   return `${humanizeValue(primaryValue)} (${PRIMARY_TAG_LABELS[primaryTag]})`;
+}
+
+function canonicalize(primaryTag: PrimaryTag, primaryValue: string): Classification {
+  const rawKey = `${primaryTag}:${primaryValue}`;
+  const nicheKey = NICHE_ALIASES[rawKey] ?? rawKey;
+  const [labelTag, labelValue] = nicheKey.split(":") as [PrimaryTag, string];
+
+  return {
+    primaryTag,
+    primaryValue,
+    nicheKey,
+    nicheLabel: nicheLabel(labelTag, labelValue),
+  };
 }
 
 /**
@@ -138,12 +173,7 @@ export function classify(tags: OsmTags): Classification | null {
     if (!raw) continue;
     const value = raw.split(";")[0]!.trim().toLowerCase();
     if (!isAllowedValue(tag, value)) continue;
-    return {
-      primaryTag: tag,
-      primaryValue: value,
-      nicheKey: `${tag}:${value}`,
-      nicheLabel: nicheLabel(tag, value),
-    };
+    return canonicalize(tag, value);
   }
 
   return null;

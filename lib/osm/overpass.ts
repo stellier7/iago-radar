@@ -205,16 +205,14 @@ export const DEFAULT_PER_REQUEST_TIMEOUT_MS = 30_000;
 export class OverpassDeadlineError extends Error {}
 
 /**
- * Runs one bbox query, retrying with backoff and failing over between mirrors.
+ * Runs one Overpass query, retrying with backoff and failing over between
+ * mirrors.
  *
  * The per-request timeout and the overall deadline are deliberately separate: a
  * single timeout covering retries plus backoff sleeps would abort the retry
  * chain before the last mirror is ever tried.
  */
-export async function fetchBusinesses(bbox: BoundingBox, options: FetchOptions = {}): Promise<OverpassElement[]> {
-  assertQueryableArea(bbox);
-
-  const query = buildBusinessQuery(bbox);
+export async function execute(query: string, options: FetchOptions = {}): Promise<OverpassElement[]> {
   const rounds = options.rounds ?? 2;
   const perRequestTimeoutMs = options.perRequestTimeoutMs ?? DEFAULT_PER_REQUEST_TIMEOUT_MS;
   const all = configuredEndpoints();
@@ -264,6 +262,12 @@ export async function fetchBusinesses(bbox: BoundingBox, options: FetchOptions =
       describeError(lastEndpoint, lastError),
     true,
   );
+}
+
+/** One business query per grid cell. Refuses anything too large to answer. */
+export async function fetchBusinesses(bbox: BoundingBox, options: FetchOptions = {}): Promise<OverpassElement[]> {
+  assertQueryableArea(bbox);
+  return execute(buildBusinessQuery(bbox), options);
 }
 
 function describeError(endpoint: string, error: unknown): string {

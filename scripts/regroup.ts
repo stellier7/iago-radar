@@ -25,6 +25,7 @@ async function main() {
   const { createZoneResolver } = await import("../lib/repo/zones");
   const { upsertBusinesses } = await import("../lib/repo/businesses");
   const { classify } = await import("../lib/osm/categories");
+  const { listPlaces } = await import("../lib/repo/places");
 
   const city = await getCityBySlug(citySlug);
   if (!city) throw new Error(`Unknown city: ${citySlug}`);
@@ -41,6 +42,18 @@ async function main() {
 
   const zoneConfig = { ...cityBbox(city), zoneSizeKm: city.zoneSizeKm };
   const pool = getPool();
+
+  if (process.argv.includes("--refresh-places")) {
+    const { fetchPlaces } = await import("../lib/osm/places");
+    const { upsertPlaces } = await import("../lib/repo/places");
+    console.log("  refreshing the neighbourhood gazetteer from Overpass...");
+    const fetched = await fetchPlaces(cityBbox(city));
+    await upsertPlaces(pool, city.id, fetched);
+    console.log(`  ${fetched.length} named places stored`);
+  }
+
+  const places = await listPlaces(city.id);
+  console.log(`  using ${places.length} named places from the gazetteer`);
   const client = await pool.connect();
   let rewritten = 0;
   let dropped = 0;
@@ -65,7 +78,7 @@ async function main() {
         continue;
       }
 
-      const zoneId = await resolveZone(deriveZone(normalized, zoneConfig));
+      const zoneId = await resolveZone(deriveZone(normalized, zoneConfig, places));
       await upsertBusinesses(client, city.id, [{ ...normalized, zoneId }]);
       rewritten += 1;
     }
@@ -81,6 +94,12 @@ async function main() {
   console.log(`  rewritten: ${rewritten}`);
   if (dropped > 0) {
     console.log(`  no longer classified as a business (left untouched): ${dropped}`);
+  }
+
+  const { pruneEmptyAutoZones } = await import("../lib/repo/zones");
+  const pruned = await pruneEmptyAutoZones(city.id);
+  if (pruned > 0) {
+    console.log(`  pruned ${pruned} empty auto-generated grid zones`);
   }
 
   await pool.end();

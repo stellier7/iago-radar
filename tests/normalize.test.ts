@@ -22,6 +22,28 @@ test("prefers the more specific key when several are present", () => {
   assert.equal(classify({ shop: "chemist", healthcare: "pharmacy" })?.nicheKey, "healthcare:pharmacy");
 });
 
+test("the same trade tagged two ways lands on one niche", () => {
+  // Tegucigalpa has ~66 amenity=pharmacy and ~66 healthcare=pharmacy.
+  assert.equal(classify({ amenity: "pharmacy" })?.nicheKey, "healthcare:pharmacy");
+  assert.equal(classify({ healthcare: "pharmacy" })?.nicheKey, "healthcare:pharmacy");
+  assert.equal(classify({ amenity: "doctors" })?.nicheKey, "healthcare:doctor");
+  assert.equal(classify({ healthcare: "doctors" })?.nicheKey, "healthcare:doctor");
+});
+
+test("an aliased niche keeps the original tag for auditing", () => {
+  const classification = classify({ amenity: "pharmacy" });
+  assert.equal(classification?.primaryTag, "amenity");
+  assert.equal(classification?.primaryValue, "pharmacy");
+  assert.equal(classification?.nicheKey, "healthcare:pharmacy");
+});
+
+test("shop=yes reads as unspecified rather than 'Yes'", () => {
+  assert.equal(classify({ shop: "yes" })?.nicheLabel, "Unspecified shop");
+  assert.equal(classify({ office: "yes" })?.nicheLabel, "Unspecified office");
+  assert.equal(classify({ shop: "bakery" })?.nicheLabel, "Bakery (Shop)");
+  assert.equal(classify({ shop: "car_repair" })?.nicheLabel, "Car Repair (Shop)");
+});
+
 test("skips non-business amenities and non-lodging tourism", () => {
   assert.equal(classify({ amenity: "bench" }), null);
   assert.equal(classify({ amenity: "bus_station" }), null);

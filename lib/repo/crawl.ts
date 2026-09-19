@@ -258,8 +258,13 @@ export async function listFailedCells(runId: number, limit = 10): Promise<Failed
   );
 }
 
-/** Releases cells left mid-flight by a function that timed out or crashed. */
-export async function requeueStaleCells(runId: number, staleAfterMs = 120_000): Promise<number> {
+/**
+ * Releases cells left mid-flight by a slice that timed out or crashed.
+ *
+ * The default window is comfortably longer than the crawler's per-cell deadline,
+ * so a cell another slice is legitimately working on is never stolen.
+ */
+export async function requeueStaleCells(runId: number, staleAfterMs = 90_000): Promise<number> {
   const rows = await query<{ id: string }>(
     `update crawl_cells
        set status = 'pending', updated_at = now()
