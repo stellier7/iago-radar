@@ -1,0 +1,62 @@
+@import "tailwindcss";
+
+@theme inline {
+  --color-canvas: var(--canvas);
+  --color-surface: var(--surface);
+  --color-surface-muted: var(--surface-muted);
+  --color-line: var(--line);
+  --color-ink: var(--ink);
+  --color-ink-muted: var(--ink-muted);
+  --color-accent: var(--accent);
+  --color-accent-ink: var(--accent-ink);
+  --color-flag: var(--flag);
+  --color-flag-ink: var(--flag-ink);
+}
+
+:root {
+  --canvas: #f6f7f9;
+  --surface: #ffffff;
+  --surface-muted: #f0f2f5;
+  --line: #dfe3e8;
+  --ink: #16191d;
+  --ink-muted: #616b76;
+  --accent: #1f6feb;
+  --accent-ink: #ffffff;
+  --flag: #fff4e5;
+  --flag-ink: #8a4b00;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --canvas: #0f1115;
+    --surface: #171a20;
+    --surface-muted: #1e222a;
+    --line: #2b313b;
+    --ink: #e8eaed;
+    --ink-muted: #9aa4b0;
+    --accent: #4d94ff;
+    --accent-ink: #08101f;
+    --flag: #2e2411;
+    --flag-ink: #f6c886;
+  }
+}
+
+html {
+  /* Stops iOS Safari from zooming when a filter input gains focus. */
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  background: var(--canvas);
+  color: var(--ink);
+  /* Keeps the sticky filter bar clear of the iPad/iPhone home indicator. */
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+/* Every tappable control stays thumb-sized regardless of its text length. */
+@utility tap-target {
+  min-height: 2.75rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
