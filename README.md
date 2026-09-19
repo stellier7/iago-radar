@@ -145,6 +145,13 @@ lives on a feature branch, `main` has no `package.json`, so Vercel has nothing t
 build and every route 404s. Either merge into `main`, or point Vercel at the
 branch under Settings → Git → Production Branch.
 
+`vercel.json` pins `"framework": "nextjs"` on purpose. If you import the project
+before the Next.js app is on the production branch, Vercel detects no framework,
+saves the Framework Preset as "Other", and keeps it — so a later build succeeds
+and then fails with `No Output Directory named "public" found`, because "Other"
+expects a static site. Pinning the framework in config makes that immune to
+whatever the dashboard happens to have saved.
+
 Then:
 
 1. Create a free Neon or Vercel Postgres database; set `DATABASE_URL` (pooled) in
