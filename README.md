@@ -83,6 +83,25 @@ The public Overpass instances fail regularly — connect timeouts and "the serve
 is probably too busy". The client tries each mirror once per round rather than
 retrying a busy mirror, and remembers which one answered last.
 
+### Only use whole-planet mirrors
+
+Some community Overpass instances host a **regional extract**, and they answer an
+out-of-region query with HTTP 200 and an empty element list — indistinguishable
+from "there are no businesses here". `overpass.osm.ch` (Switzerland) was in the
+default list at first and silently zeroed 17 of Tegucigalpa's 64 cells, losing
+938 real businesses without a single error.
+
+So verify any mirror you add against a known-busy box before trusting it:
+
+```bash
+curl -s https://<mirror>/api/interpreter --data-urlencode \
+  'data=[out:json];nwr["shop"](14.0967,-87.2067,14.1146,-87.1882);out tags center;' | head -c 200
+```
+
+A working global mirror returns a couple of hundred elements. As a backstop, a
+run that finishes having seen zero elements across every cell records that as an
+error on the run instead of looking like a successful empty crawl.
+
 ## Grouping
 
 Every business gets both:

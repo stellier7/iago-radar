@@ -39,6 +39,7 @@ export default async function ProspectsPage({ searchParams }: { searchParams: Pr
     search: state.search,
     namedOnly: state.namedOnly,
     sort: state.sort,
+    grouped: state.grouped,
     limit: PAGE_SIZE,
     offset: (state.page - 1) * PAGE_SIZE,
   };

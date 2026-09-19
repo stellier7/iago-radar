@@ -1,7 +1,7 @@
 import type { SortKey, WebsiteFilter } from "../repo/businesses";
 
-/** Generous page size: grouping by zone only reads well with a whole zone on screen. */
-export const PAGE_SIZE = 250;
+/** Small enough to keep the mobile payload sane, large enough to hold a few zones. */
+export const PAGE_SIZE = 100;
 
 export type FilterState = {
   citySlug: string;

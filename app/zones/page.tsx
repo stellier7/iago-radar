@@ -1,4 +1,4 @@
-import { ZoneRow } from "@/components/zone-row";
+import { ZoneManager } from "@/components/zone-manager";
 import { getCityBySlug } from "@/lib/repo/cities";
 import { listZonesWithCounts } from "@/lib/repo/zones";
 import { parseFilters, type RawSearchParams } from "@/lib/ui/filters";
@@ -36,26 +36,11 @@ export default async function ZonesPage({ searchParams }: { searchParams: Promis
           Zones appear after the first crawl.
         </p>
       ) : (
-        <ul className="space-y-2">
-          {active
+        <ZoneManager
+          zones={active
             .slice()
-            .sort((a, b) => b.businessCount - a.businessCount || a.name.localeCompare(b.name))
-            .map((zone) => (
-              <li key={zone.id} className="contents">
-                <details className="rounded-xl border border-line bg-surface-muted">
-                  <summary className="tap-target cursor-pointer select-none px-3 text-sm font-semibold">
-                    {zone.name}
-                    <span className="ml-2 font-normal text-ink-muted">
-                      {zone.businessCount} · {zone.prospectCount} without a site
-                    </span>
-                  </summary>
-                  <ul className="p-2 pt-0">
-                    <ZoneRow zone={zone} allZones={active} />
-                  </ul>
-                </details>
-              </li>
-            ))}
-        </ul>
+            .sort((a, b) => b.businessCount - a.businessCount || a.name.localeCompare(b.name))}
+        />
       )}
 
       {merged.length > 0 && (

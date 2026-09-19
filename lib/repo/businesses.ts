@@ -192,6 +192,8 @@ export type BusinessFilters = {
   search: string | null;
   namedOnly: boolean;
   sort: SortKey;
+  /** When grouping by zone, the busiest zones lead instead of alphabetical order. */
+  grouped: boolean;
   limit: number;
   offset: number;
 };
@@ -246,6 +248,11 @@ export async function listBusinesses(filters: BusinessFilters): Promise<Business
   const { sql, params } = buildClauses(filters);
   params.push(filters.limit, filters.offset);
 
+  // Grouped view: keep a zone's businesses together, busiest zone first, so the
+  // neighbourhoods worth walking lead instead of the alphabet. Flat view sorts
+  // purely by the chosen key.
+  const groupOrder = filters.grouped ? "count(*) over (partition by b.zone_id) desc, z.name asc nulls last, " : "";
+
   const rows = await query<BusinessRow>(
     `
     select b.id, b.osm_type, b.osm_id, b.name, b.primary_tag, b.primary_value, b.niche_key,
@@ -255,7 +262,7 @@ export async function listBusinesses(filters: BusinessFilters): Promise<Business
     from businesses b
     left join zones z on z.id = b.zone_id
     where ${sql.join(" and ")}
-    order by z.name asc nulls last, ${SORT_SQL[filters.sort]}
+    order by ${groupOrder}${SORT_SQL[filters.sort]}
     limit $${params.length - 1} offset $${params.length}
     `,
     params,

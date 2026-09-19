@@ -2,7 +2,7 @@ import { splitIntoCells } from "../geo/grid";
 import { dedupeByOsmId, normalizeElement } from "../osm/normalize";
 import { fetchBusinesses, OVERPASS_TIMEOUT_SECONDS, sleep } from "../osm/overpass";
 import { fetchPlaces } from "../osm/places";
-import { listPlaces, upsertPlaces } from "../repo/places";
+import { listPlaces, placesLastUpdatedAt, upsertPlaces } from "../repo/places";
 import { upsertBusinesses, type BusinessWithZone } from "../repo/businesses";
 import { cityBbox, getCityBySlug, type City } from "../repo/cities";
 import {
@@ -53,12 +53,28 @@ const PER_REQUEST_TIMEOUT_MS = 20_000;
 const MIN_TIME_FOR_ANOTHER_CELL_MS = 6_000;
 
 /**
+ * Ceiling on the estimate used to decide whether another cell fits. One cell
+ * that took 30s while the mirrors were struggling must not convince the slice
+ * that no further cell is worth starting - overrunning is cheap, because the
+ * cell's own deadline is clamped to the slice budget and the request timeout
+ * bounds the overshoot well inside the function's limit.
+ */
+const MAX_CELL_ESTIMATE_MS = 15_000;
+
+/**
  * When every outstanding cell is held by another slice (or by one that died
  * moments ago), wait for it to either finish or go stale rather than declaring
  * the run complete.
  */
 const IDLE_WAIT_MS = 5_000;
 const MAX_IDLE_WAIT_TOTAL_MS = 120_000;
+
+/**
+ * How long the neighbourhood gazetteer is trusted before being re-swept. New
+ * colonias get mapped occasionally; nightly is far more often than needed, and
+ * the sweep competes with grid cells for the slice's budget.
+ */
+const GAZETTEER_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000;
 
 async function getOrCreateRun(
   city: City,
@@ -74,15 +90,19 @@ async function getOrCreateRun(
     await finishRun(existing.id, progress);
   }
 
-  // Refresh the neighbourhood gazetteer once per run, before any cell is
-  // crawled, so businesses get real zone names on their first pass. A failure
-  // here is not fatal: zones fall back to grid squares.
-  try {
-    const places = await fetchPlaces(cityBbox(city));
-    const written = await upsertPlaces(getPool(), city.id, places);
-    log(`Gazetteer: ${places.length} named places found, ${written} stored.`);
-  } catch (error) {
-    log(`Gazetteer refresh failed, falling back to grid zones: ${(error as Error).message}`);
+  // Neighbourhood names barely change, and the sweep spends both Overpass
+  // requests and slice budget, so refresh it only when it is missing or old.
+  // A failure here is not fatal: zones fall back to grid squares.
+  const lastSwept = await placesLastUpdatedAt(city.id);
+  const isStale = lastSwept === null || Date.now() - lastSwept.getTime() > GAZETTEER_MAX_AGE_MS;
+  if (isStale) {
+    try {
+      const places = await fetchPlaces(cityBbox(city));
+      const written = await upsertPlaces(getPool(), city.id, places);
+      log(`Gazetteer: ${places.length} named places found, ${written} stored.`);
+    } catch (error) {
+      log(`Gazetteer refresh failed, falling back to grid zones: ${(error as Error).message}`);
+    }
   }
 
   const cells = splitIntoCells(cityBbox(city), city.cellSizeKm);
@@ -120,7 +140,7 @@ export async function runCrawlSlice(options: CrawlSliceOptions): Promise<CrawlSl
   while (true) {
     const elapsed = Date.now() - startedAt;
     const remaining = options.budgetMs - elapsed;
-    const needed = Math.max(MIN_TIME_FOR_ANOTHER_CELL_MS, observedCellMs * 1.5);
+    const needed = Math.max(MIN_TIME_FOR_ANOTHER_CELL_MS, Math.min(observedCellMs * 1.5, MAX_CELL_ESTIMATE_MS));
     if (remaining < needed) {
       log(`Budget nearly spent (${remaining}ms left, need ~${Math.round(needed)}ms); stopping this slice.`);
       break;
@@ -179,7 +199,7 @@ export async function runCrawlSlice(options: CrawlSliceOptions): Promise<CrawlSl
       }
 
       const durationMs = Date.now() - cellStartedAt;
-      observedCellMs = Math.max(observedCellMs * 0.5, durationMs);
+      observedCellMs = observedCellMs * 0.7 + durationMs * 0.3;
       await completeCell({
         cellId: cell.id,
         runId: run.id,

@@ -5,11 +5,24 @@ import { userAgent } from "./user-agent";
 /**
  * Public Overpass instances, tried in order. All are free and keyless.
  * Override with OVERPASS_ENDPOINTS (comma separated) if one goes bad.
+ *
+ * Every entry here must serve the whole planet. Some community instances host a
+ * regional extract only - `overpass.osm.ch` is Switzerland - and they answer a
+ * Honduras query with HTTP 200 and an empty element list, which is
+ * indistinguishable from "there are no businesses here". That silently produces
+ * an empty crawl, so verify a new mirror against a known-busy bbox before adding
+ * it:
+ *
+ *   curl -s https://<mirror>/api/interpreter --data-urlencode \
+ *     'data=[out:json];nwr["shop"](14.0967,-87.2067,14.1146,-87.1882);out tags center;' \
+ *     | head -c 200
+ *
+ * A working global mirror returns a couple of hundred elements for that box.
  */
 const DEFAULT_ENDPOINTS = [
   "https://overpass-api.de/api/interpreter",
   "https://overpass.private.coffee/api/interpreter",
-  "https://overpass.osm.ch/api/interpreter",
+  "https://overpass.openstreetmap.fr/api/interpreter",
 ];
 
 /** Overpass's own server-side timeout, in seconds, via the `[timeout:]` setting. */

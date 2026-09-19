@@ -233,14 +233,29 @@ export async function getRunProgress(runId: number): Promise<RunProgress> {
 }
 
 export async function finishRun(runId: number, progress: RunProgress): Promise<void> {
-  const error = progress.failed > 0 ? `${progress.failed} of ${progress.total} cells failed after retries` : null;
+  const problems: string[] = [];
+  if (progress.failed > 0) {
+    problems.push(`${progress.failed} of ${progress.total} cells failed after retries`);
+  }
+
+  // A city that returns nothing at all is not an empty city. The usual cause is
+  // an Overpass mirror serving a regional extract, which answers out-of-region
+  // queries with HTTP 200 and no elements.
+  const run = await getRun(runId);
+  if (run && run.elementsSeen === 0 && progress.done > 0) {
+    problems.push(
+      `every one of ${progress.done} cells came back empty - check that each OVERPASS_ENDPOINTS mirror serves ` +
+        "the whole planet and not a regional extract",
+    );
+  }
+
   await query(
     `update crawl_runs
        set status = case when $3::int = $2::int then 'failed' else 'completed' end,
            finished_at = now(),
            error = $4
      where id = $1`,
-    [runId, progress.total, progress.failed, error],
+    [runId, progress.total, progress.failed, problems.length > 0 ? problems.join("; ") : null],
   );
 }
 

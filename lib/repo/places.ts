@@ -29,6 +29,15 @@ export async function upsertPlaces(db: Queryable, cityId: number, places: OsmPla
   return result.rowCount ?? 0;
 }
 
+/** Newest gazetteer row for a city, or null when it has never been swept. */
+export async function placesLastUpdatedAt(cityId: number): Promise<Date | null> {
+  const rows = await query<{ updated_at: Date | null }>(
+    "select max(updated_at) as updated_at from places where city_id = $1",
+    [cityId],
+  );
+  return rows[0]?.updated_at ?? null;
+}
+
 export async function listPlaces(cityId: number): Promise<OsmPlace[]> {
   const rows = await query<{
     osm_type: "node" | "way" | "relation";
