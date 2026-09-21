@@ -92,10 +92,12 @@ async function getOrCreateRun(
 
   // Neighbourhood names barely change, and the sweep spends both Overpass
   // requests and slice budget, so refresh it only when it is missing or old.
+  // Manual slices are short (iPad button); let them fill the grid first and
+  // leave the gazetteer to cron, which has a larger budget per invocation.
   // A failure here is not fatal: zones fall back to grid squares.
   const lastSwept = await placesLastUpdatedAt(city.id);
   const isStale = lastSwept === null || Date.now() - lastSwept.getTime() > GAZETTEER_MAX_AGE_MS;
-  if (isStale) {
+  if (isStale && trigger === "cron") {
     try {
       const places = await fetchPlaces(cityBbox(city));
       const written = await upsertPlaces(getPool(), city.id, places);
