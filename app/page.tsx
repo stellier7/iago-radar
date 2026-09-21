@@ -2,8 +2,10 @@ import Link from "next/link";
 
 import { BusinessCard } from "@/components/business-card";
 import { FilterBar } from "@/components/filter-bar";
+import { MapPanel } from "@/components/map-panel";
 import {
   listBusinesses,
+  listMapMarkers,
   nicheFacets,
   summarize,
   templateFacets,
@@ -12,8 +14,9 @@ import {
   type BusinessRecord,
 } from "@/lib/repo/businesses";
 import { SetupNotice } from "@/components/setup-notice";
-import { getCityBySlug } from "@/lib/repo/cities";
+import { cityBbox, getCityBySlug } from "@/lib/repo/cities";
 import { PAGE_SIZE, parseFilters, toQueryString, type RawSearchParams } from "@/lib/ui/filters";
+import { viewportFromBBox, viewportFromMarkers } from "@/lib/ui/map";
 import { loadOrExplainSetup } from "@/lib/ui/setup";
 
 export const dynamic = "force-dynamic";
@@ -49,7 +52,7 @@ export default async function ProspectsPage({ searchParams }: { searchParams: Pr
     offset: (state.page - 1) * PAGE_SIZE,
   };
 
-  const [businesses, summary, zones, niches, templates, allWebsiteStates] = await Promise.all([
+  const [businesses, summary, zones, niches, templates, allWebsiteStates, mapMarkers] = await Promise.all([
     listBusinesses(filters),
     summarize(filters),
     zoneFacets(filters),
@@ -57,7 +60,19 @@ export default async function ProspectsPage({ searchParams }: { searchParams: Pr
     templateFacets(filters),
     // Counts for the website segmented control, ignoring its own selection.
     summarize({ ...filters, website: "all" }),
+    listMapMarkers({
+      cityId: city.id,
+      zoneIds: state.zoneIds,
+      includeNoZone: state.includeNoZone,
+      nicheKeys: state.nicheKeys,
+      templateKeys: state.templateKeys,
+      website: state.website,
+      search: state.search,
+      namedOnly: state.namedOnly,
+    }),
   ]);
+
+  const mapViewport = viewportFromMarkers(mapMarkers, viewportFromBBox(cityBbox(city)));
 
   return (
     <div>
@@ -82,6 +97,17 @@ export default async function ProspectsPage({ searchParams }: { searchParams: Pr
         &ldquo;No site found&rdquo; means OpenStreetMap has no website tag. Treat it as a lead worth checking, not proof
         the business has no site.
       </p>
+
+      <MapPanel
+        title="Map preview"
+        hint={
+          summary.total > mapMarkers.length
+            ? `Showing up to ${mapMarkers.length} locations from the current filters (first ${mapMarkers.length} of ${summary.total}).`
+            : "Pins follow your current filters."
+        }
+        markers={mapMarkers}
+        viewport={mapViewport}
+      />
 
       {businesses.length === 0 ? (
         <EmptyState title="Nothing matches these filters">

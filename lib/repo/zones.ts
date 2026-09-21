@@ -1,4 +1,5 @@
 import { getPool, query, type Queryable } from "../db";
+import type { MapMarker } from "../ui/map";
 import type { ZoneAssignment } from "../zones/derive";
 
 export type ZoneSource = "osm_tag" | "osm_place" | "grid";
@@ -187,4 +188,46 @@ export async function mergeZones(sourceZoneId: number, targetZoneId: number): Pr
   } finally {
     client.release();
   }
+}
+
+/** One pin per zone at the average business location, for the zones map preview. */
+export async function listZoneMapMarkers(cityId: number): Promise<MapMarker[]> {
+  const rows = await query<{
+    id: number;
+    name: string;
+    lat: string;
+    lon: string;
+    business_count: string;
+    prospect_count: string;
+  }>(
+    `
+    select z.id, z.name,
+           avg(b.lat) as lat,
+           avg(b.lon) as lon,
+           count(b.id) as business_count,
+           count(b.id) filter (where b.has_website = false) as prospect_count
+    from zones z
+    join businesses b on b.zone_id = z.id
+    where z.city_id = $1
+      and z.merged_into_zone_id is null
+      and b.lat is not null
+      and b.lon is not null
+    group by z.id, z.name
+    having count(b.id) > 0
+    order by count(b.id) desc, z.name asc
+    `,
+    [cityId],
+  );
+
+  return rows.map((row) => ({
+    id: `zone-${row.id}`,
+    lat: Number(row.lat),
+    lon: Number(row.lon),
+    label: row.name,
+    subtitle: `${row.prospect_count} without a site · ${row.business_count} total`,
+    variant: "zone" as const,
+    prospectCount: Number(row.prospect_count),
+    totalCount: Number(row.business_count),
+    href: `/?zone=${row.id}`,
+  }));
 }

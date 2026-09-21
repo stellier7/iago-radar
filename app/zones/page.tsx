@@ -1,8 +1,10 @@
 import { SetupNotice } from "@/components/setup-notice";
+import { MapPanel } from "@/components/map-panel";
 import { ZoneManager } from "@/components/zone-manager";
-import { getCityBySlug } from "@/lib/repo/cities";
-import { listZonesWithCounts } from "@/lib/repo/zones";
+import { cityBbox, getCityBySlug } from "@/lib/repo/cities";
+import { listZoneMapMarkers, listZonesWithCounts } from "@/lib/repo/zones";
 import { parseFilters, type RawSearchParams } from "@/lib/ui/filters";
+import { viewportFromBBox, viewportFromMarkers } from "@/lib/ui/map";
 import { loadOrExplainSetup } from "@/lib/ui/setup";
 
 export const dynamic = "force-dynamic";
@@ -19,6 +21,8 @@ export default async function ZonesPage({ searchParams }: { searchParams: Promis
   }
 
   const zones = await listZonesWithCounts(city.id);
+  const zoneMarkers = await listZoneMapMarkers(city.id);
+  const mapViewport = viewportFromMarkers(zoneMarkers, viewportFromBBox(cityBbox(city)));
   const merged = zones.filter((zone) => zone.mergedIntoZoneId !== null);
   // An empty zone is a leftover from re-deriving; there is nothing to act on.
   const active = zones.filter((zone) => zone.mergedIntoZoneId === null && zone.businessCount > 0);
@@ -35,6 +39,14 @@ export default async function ZonesPage({ searchParams }: { searchParams: Promis
         grid square. Rename one once you recognise the area, or merge it into a neighbour. Renaming keeps a zone&rsquo;s
         identity, so the next crawl files businesses under the name you chose.
       </p>
+
+      <MapPanel
+        title="Zone map"
+        hint="Each pin is the average location of businesses in that zone. Tap one to jump to its prospects."
+        markers={zoneMarkers}
+        viewport={mapViewport}
+        defaultOpen
+      />
 
       {active.length === 0 ? (
         <p className="rounded-xl border border-dashed border-line bg-surface p-6 text-center text-sm text-ink-muted">

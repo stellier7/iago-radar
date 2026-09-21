@@ -1,5 +1,6 @@
 import { query, type Queryable } from "../db";
 import type { NormalizedBusiness } from "../osm/normalize";
+import type { MapMarker } from "../ui/map";
 import { templateForNiche } from "../templates/registry";
 
 export type BusinessRecord = {
@@ -371,5 +372,51 @@ export async function templateFacets(filters: BusinessFilters): Promise<Facet[]>
     label: row.template_key,
     total: Number(row.total),
     prospects: Number(row.prospects),
+  }));
+}
+
+const MAP_MARKER_LIMIT = 500;
+
+/** Lightweight lat/lon rows for the map preview. Respects the same filters as the list. */
+export async function listMapMarkers(
+  filters: Omit<BusinessFilters, "limit" | "offset" | "sort" | "grouped">,
+  limit = MAP_MARKER_LIMIT,
+): Promise<MapMarker[]> {
+  const { sql, params } = buildClauses({
+    ...filters,
+    sort: "name",
+    grouped: false,
+    limit,
+    offset: 0,
+  });
+  params.push(limit);
+
+  const rows = await query<{
+    id: string;
+    name: string | null;
+    niche_label: string;
+    lat: number;
+    lon: number;
+    has_website: boolean;
+    zone_name: string | null;
+  }>(
+    `
+    select b.id, b.name, b.niche_label, b.lat, b.lon, b.has_website, z.name as zone_name
+    from businesses b
+    left join zones z on z.id = b.zone_id
+    where ${sql.join(" and ")} and b.lat is not null and b.lon is not null
+    order by b.has_website asc, b.name asc nulls last, b.id asc
+    limit $${params.length}
+    `,
+    params,
+  );
+
+  return rows.map((row) => ({
+    id: String(row.id),
+    lat: row.lat,
+    lon: row.lon,
+    label: row.name ?? row.niche_label,
+    subtitle: row.zone_name ?? undefined,
+    variant: row.has_website ? "website" : "prospect",
   }));
 }

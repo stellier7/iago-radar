@@ -10,11 +10,12 @@ database stores the results. No paid API tier or billing account anywhere.
 ## Status: Phase 1
 
 - **Phase 1 (done)** — single-city crawler for Tegucigalpa, Postgres schema,
-  results list filterable by zone *and* niche at the same time.
+  results list filterable by zone *and* niche at the same time, map preview on
+  Prospects and Zones (Leaflet + OSM tiles).
 - **Phase 2 (next)** — CSV export, "Start build" creating a draft site from the
   matched template, pipeline save.
 - **Phase 3** — more niche templates as they get built.
-- **Phase 4 (later)** — Leaflet map view of the same stored rows, using OSM tiles.
+- **Phase 4 (later)** — full-screen map view and richer map interactions.
   No new data source.
 
 Niche → template matching and the zone/niche grouping model are already in the
