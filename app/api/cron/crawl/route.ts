@@ -24,12 +24,13 @@ const MAX_CHAIN_DEPTH = 30;
 const DEFAULT_CITY = "tegucigalpa";
 
 function isAuthorized(request: NextRequest): boolean {
-  const secret = process.env.CRON_SECRET;
+  const secret = process.env.CRON_SECRET?.trim();
   if (!secret) {
     // Without a secret configured, only allow local development.
     return process.env.NODE_ENV !== "production";
   }
-  return request.headers.get("authorization") === `Bearer ${secret}`;
+  const header = request.headers.get("authorization")?.trim();
+  return header === `Bearer ${secret}`;
 }
 
 function baseUrl(request: NextRequest): string {
@@ -46,7 +47,8 @@ async function chainNextSlice(request: NextRequest, citySlug: string, depth: num
   url.searchParams.set("depth", String(depth));
 
   const headers: Record<string, string> = {};
-  if (process.env.CRON_SECRET) headers.authorization = `Bearer ${process.env.CRON_SECRET}`;
+  const secret = process.env.CRON_SECRET?.trim();
+  if (secret) headers.authorization = `Bearer ${secret}`;
 
   try {
     await fetch(url, { headers, cache: "no-store" });

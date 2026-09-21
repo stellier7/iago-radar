@@ -25,16 +25,25 @@ export async function runSliceAction(
     const result = await runCrawlSlice({
       citySlug,
       trigger: "manual",
-      // Well inside Vercel's Hobby function limit.
-      budgetMs: 25_000,
+      // Hobby functions allow 60s; leave headroom for DB writes after Overpass.
+      budgetMs: 50_000,
       maxCells: 5,
     });
     revalidatePath("/crawl");
     revalidatePath("/");
+    if (result.cellsProcessed === 0 && result.outstanding > 0) {
+      return {
+        message: null,
+        error:
+          `Run ${result.runId} is queued but this tap did not finish any cells (often a cold start). ` +
+          "Tap again — it resumes where it left off.",
+      };
+    }
     return {
       message:
         `Run ${result.runId}: ${result.cellsProcessed} cells, ${result.businessesUpserted} rows written, ` +
-        `${result.outstanding} cells still queued.`,
+        `${result.outstanding} cells still queued.` +
+        (result.outstanding > 0 ? " Tap again for the next batch." : ""),
       error: null,
     };
   } catch (error) {
