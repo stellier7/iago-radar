@@ -53,6 +53,13 @@ body {
   padding-bottom: env(safe-area-inset-bottom);
 }
 
+/* Scrollable filter panels on iOS: contain overscroll so the page behind does not move. */
+@utility scroll-panel {
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
 /* Every tappable control stays thumb-sized regardless of its text length. */
 @utility tap-target {
   min-height: 2.75rem;

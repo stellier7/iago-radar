@@ -74,12 +74,11 @@ export function FilterBar({ zones, niches, templates, selected, websiteCounts }:
     zoneSelection.size + selected.nicheKeys.length + selected.templateKeys.length + (selected.namedOnly ? 1 : 0);
 
   return (
-    <div
-      className={`sticky top-0 z-10 -mx-3 mb-4 border-b border-line bg-canvas/95 px-3 pb-3 pt-2 backdrop-blur sm:-mx-5 sm:px-5 ${
-        isPending ? "opacity-70" : ""
-      }`}
-    >
-      <div className="flex gap-2">
+    <div className={`mb-4 ${isPending ? "opacity-70" : ""}`}>
+      {/* Sticky only the compact controls. Expanded niche lists live below so iOS
+          does not trap touch scrolling inside a sticky panel taller than the viewport. */}
+      <div className="sticky top-0 z-10 -mx-3 border-b border-line bg-canvas/95 px-3 pb-2 pt-2 backdrop-blur sm:-mx-5 sm:px-5">
+        <div className="flex gap-2">
         <form
           className="flex-1"
           onSubmit={(event) => {
@@ -128,16 +127,17 @@ export function FilterBar({ zones, niches, templates, selected, websiteCounts }:
             </span>
           </button>
         ))}
+        </div>
       </div>
 
-      <details className="mt-2 rounded-lg border border-line bg-surface">
+      <details className="relative z-0 -mx-3 mt-2 rounded-lg border border-line bg-surface sm:-mx-5">
         <summary className="tap-target cursor-pointer select-none px-3 text-sm font-medium">
           Zone &amp; niche filters
           {activeCount > 0 && (
             <span className="ml-2 rounded-full bg-accent px-2 py-0.5 text-xs text-accent-ink">{activeCount}</span>
           )}
         </summary>
-        <div className="space-y-4 border-t border-line px-3 py-3">
+        <div className="scroll-panel max-h-[min(55vh,24rem)] space-y-4 border-t border-line px-3 py-3 sm:max-h-[min(60vh,28rem)]">
           <ChipGroup
             title="Zones"
             facets={zones}
@@ -252,6 +252,15 @@ function ChipGroup({
             className="min-h-9 rounded-full border border-dashed border-line px-3 text-sm text-ink-muted"
           >
             +{facets.length - visible.length} more
+          </button>
+        )}
+        {expanded && facets.length > CHIPS_BEFORE_COLLAPSE && (
+          <button
+            type="button"
+            onClick={() => setExpanded(false)}
+            className="min-h-9 rounded-full border border-line px-3 text-sm text-ink-muted"
+          >
+            Show less
           </button>
         )}
       </div>
