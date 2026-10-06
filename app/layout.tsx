@@ -1,7 +1,11 @@
 import type { Metadata, Viewport } from "next";
+import { Suspense } from "react";
 
 import "./globals.css";
+import { CitySelector } from "@/components/city-selector";
 import { NavTabs } from "@/components/nav-tabs";
+import { isDatabaseConfigured } from "@/lib/ui/setup";
+import { listCities } from "@/lib/repo/cities";
 
 export const metadata: Metadata = {
   title: "Iago Radar",
@@ -19,16 +23,29 @@ export const viewport: Viewport = {
   ],
 };
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  let cities: Array<{ slug: string; name: string }> = [];
+  if (isDatabaseConfigured()) {
+    try {
+      cities = (await listCities()).filter((city) => city.isActive).map((city) => ({ slug: city.slug, name: city.name }));
+    } catch {
+      cities = [];
+    }
+  }
+
   return (
     <html lang="en">
       <body className="antialiased">
         <div className="mx-auto max-w-3xl px-3 pb-16 sm:px-5">
-          <header className="flex items-baseline justify-between gap-3 py-4">
+          <header className="flex items-center justify-between gap-3 py-4">
             <h1 className="text-lg font-semibold tracking-tight">Iago Radar</h1>
-            <p className="text-xs text-ink-muted">OpenStreetMap data</p>
+            <Suspense fallback={<span className="text-xs text-ink-muted">Location</span>}>
+              <CitySelector cities={cities} />
+            </Suspense>
           </header>
-          <NavTabs />
+          <Suspense fallback={<div className="h-11 rounded-xl bg-surface-muted" />}>
+            <NavTabs />
+          </Suspense>
           <main className="pt-4">{children}</main>
         </div>
       </body>

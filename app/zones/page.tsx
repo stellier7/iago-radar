@@ -21,7 +21,7 @@ export default async function ZonesPage({ searchParams }: { searchParams: Promis
   }
 
   const zones = await listZonesWithCounts(city.id);
-  const zoneMarkers = await listZoneMapMarkers(city.id);
+  const zoneMarkers = await listZoneMapMarkers(city.id, city.slug);
   const mapViewport = viewportFromMarkers(zoneMarkers, viewportFromBBox(cityBbox(city)));
   const merged = zones.filter((zone) => zone.mergedIntoZoneId !== null);
   // An empty zone is a leftover from re-deriving; there is nothing to act on.

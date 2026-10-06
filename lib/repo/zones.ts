@@ -191,7 +191,7 @@ export async function mergeZones(sourceZoneId: number, targetZoneId: number): Pr
 }
 
 /** One pin per zone at the average business location, for the zones map preview. */
-export async function listZoneMapMarkers(cityId: number): Promise<MapMarker[]> {
+export async function listZoneMapMarkers(cityId: number, citySlug: string): Promise<MapMarker[]> {
   const rows = await query<{
     id: number;
     name: string;
@@ -219,15 +219,19 @@ export async function listZoneMapMarkers(cityId: number): Promise<MapMarker[]> {
     [cityId],
   );
 
-  return rows.map((row) => ({
-    id: `zone-${row.id}`,
-    lat: Number(row.lat),
-    lon: Number(row.lon),
-    label: row.name,
-    subtitle: `${row.prospect_count} without a site · ${row.business_count} total`,
-    variant: "zone" as const,
-    prospectCount: Number(row.prospect_count),
-    totalCount: Number(row.business_count),
-    href: `/?zone=${row.id}`,
-  }));
+  return rows.map((row) => {
+    const params = new URLSearchParams({ zone: String(row.id) });
+    if (citySlug !== "tegucigalpa") params.set("city", citySlug);
+    return {
+      id: `zone-${row.id}`,
+      lat: Number(row.lat),
+      lon: Number(row.lon),
+      label: row.name,
+      subtitle: `${row.prospect_count} without a site · ${row.business_count} total`,
+      variant: "zone" as const,
+      prospectCount: Number(row.prospect_count),
+      totalCount: Number(row.business_count),
+      href: `/?${params.toString()}`,
+    };
+  });
 }

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 
 const TABS = [
   { href: "/", label: "Prospects" },
@@ -11,6 +11,15 @@ const TABS = [
 
 export function NavTabs() {
   const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const city = searchParams.get("city");
+
+  function hrefFor(tabHref: string): string {
+    if (!city) return tabHref;
+    const params = new URLSearchParams();
+    params.set("city", city);
+    return `${tabHref}?${params.toString()}`;
+  }
 
   return (
     <nav className="flex gap-2 rounded-xl bg-surface-muted p-1">
@@ -19,7 +28,7 @@ export function NavTabs() {
         return (
           <Link
             key={tab.href}
-            href={tab.href}
+            href={hrefFor(tab.href)}
             aria-current={active ? "page" : undefined}
             className={`tap-target flex-1 rounded-lg px-3 text-sm font-medium transition ${
               active ? "bg-surface text-ink shadow-sm" : "text-ink-muted"

@@ -5,6 +5,10 @@
     {
       "path": "/api/cron/crawl?city=tegucigalpa",
       "schedule": "0 7 * * *"
+    },
+    {
+      "path": "/api/cron/crawl?city=comayagua",
+      "schedule": "30 7 * * *"
     }
   ]
 }

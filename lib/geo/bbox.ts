@@ -48,3 +48,31 @@ export function distanceKm(aLat: number, aLon: number, bLat: number, bLon: numbe
 export function contains(bbox: BoundingBox, lat: number, lon: number): boolean {
   return lat >= bbox.minLat && lat <= bbox.maxLat && lon >= bbox.minLon && lon <= bbox.maxLon;
 }
+
+/**
+ * Square bounding box centred on a point. Used when Nominatim returns a whole
+ * municipality/department that is too large to crawl cell-by-cell.
+ */
+export function squareAround(lat: number, lon: number, halfSideKm: number): BoundingBox {
+  const dLat = kmToLatDegrees(halfSideKm);
+  const dLon = kmToLonDegrees(halfSideKm, lat);
+  return {
+    minLat: lat - dLat,
+    maxLat: lat + dLat,
+    minLon: lon - dLon,
+    maxLon: lon + dLon,
+  };
+}
+
+/** Municipality-scale Nominatim boxes are common; crawl budgets are not. */
+export const MAX_CRAWL_AREA_KM2 = 400;
+
+/**
+ * If a Nominatim box is too large (e.g. Comayagua municipality ≈ 1,350 km²),
+ * shrink to a square around its centre sized for a practical Overpass grid.
+ */
+export function clampBBoxForCrawl(bbox: BoundingBox, halfSideKm = 7): BoundingBox {
+  if (areaKm2(bbox) <= MAX_CRAWL_AREA_KM2) return bbox;
+  const { lat, lon } = centerOf(bbox);
+  return squareAround(lat, lon, halfSideKm);
+}

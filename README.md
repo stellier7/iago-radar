@@ -162,10 +162,11 @@ Then:
    `CRON_SECRET` the cron route rejects Vercel's own call in production, so the
    nightly crawl never runs.
 3. Deploy. The build runs the migrations itself (`vercel-build`), so the schema
-   and the Tegucigalpa row are created for you. Concurrent builds are safe: the
-   runner takes a Postgres advisory lock.
-4. `vercel.json` registers the nightly cron at 07:00 UTC (01:00 in Honduras),
-   which Vercel calls with `Authorization: Bearer $CRON_SECRET`.
+   and the Tegucigalpa + Comayagua rows are created for you. Concurrent builds
+   are safe: the runner takes a Postgres advisory lock.
+4. `vercel.json` registers two nightly crons (Hobby limit): Tegucigalpa at
+   07:00 UTC and Comayagua at 07:30 UTC. Vercel calls them with
+   `Authorization: Bearer $CRON_SECRET`.
 
 Until `DATABASE_URL` is set, or if the migrations have not run, the app shows a
 setup screen naming the missing step instead of a stack trace.
@@ -181,15 +182,21 @@ city in one night.
 it unset in production — the deployment is public, and that button spends Overpass
 requests.
 
-## Adding a city
+## Cities / locations
+
+The header dropdown switches between stored cities (Tegucigalpa and Comayagua are
+seeded). **Add location…** geocodes a new place with Nominatim and stores it.
+Municipality-scale boxes that are too large to crawl are shrunk to a ~14 km
+urban square.
 
 ```bash
-npx tsx scripts/add-city.ts --name=Comayagua --country=Honduras
-npm run crawl -- --city=comayagua
+npx tsx scripts/add-city.ts --name=Siguatepeque --country=Honduras
+npm run crawl -- --city=siguatepeque
 ```
 
-It geocodes with Nominatim, prints the resulting grid size, and stores the city.
-To crawl it nightly, add a second entry to `vercel.json` (Hobby allows two).
+Hobby allows two cron jobs; both slots are used (Tegucigalpa + Comayagua). Extra
+cities need a manual crawl from `/crawl` (`ENABLE_MANUAL_CRAWL=1`) or a local
+`npm run crawl -- --city=<slug>`.
 
 ## Scripts
 
